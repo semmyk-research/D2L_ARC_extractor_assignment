@@ -2,7 +2,7 @@
 Utility helpers for name cleaning and sanitisation.
 """
 import re
-import os
+from pathlib import Path
 
 
 def clean_subfolder_middle_part(dirpath: str) -> str:
@@ -22,7 +22,7 @@ def clean_subfolder_middle_part(dirpath: str) -> str:
     if not dirpath:
         return ''
     # Use the last directory part
-    last = os.path.basename(dirpath.rstrip('/\\'))
+    last = Path(dirpath.rstrip('/\\')).name
     if not last:
         return ''
 
@@ -60,7 +60,7 @@ def sanitize_zip_name(name: str) -> str:
     """Sanitise a filename (without forcing extension) for use as a zip name.
     Replace non-alphanumeric sequences with underscore and collapse multiples.
     """
-    base = os.path.splitext(name)[0]
+    base = Path(name).stem
     # Replace any sequence of non-alphanumeric with underscore
     s = re.sub(r"[^0-9A-Za-z]+", '_', base)
     s = re.sub(r"_+", '_', s).strip('_')

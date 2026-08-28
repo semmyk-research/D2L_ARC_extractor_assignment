@@ -1,5 +1,6 @@
 """
 Extractor package for archive handling.
+
 Functions to parse zip archives, select files by extension, rename using subfolder middle part,
 and produce a new zip archive containing only the extracted renamed files.
 
@@ -7,7 +8,7 @@ Follow DRY principles and keep pure functions to ease testing.
 """
 from io import BytesIO
 import zipfile
-import os
+from pathlib import Path
 import re
 from .utils import clean_subfolder_middle_part, sanitize_zip_name
 
@@ -31,23 +32,24 @@ def extract_and_rename(zip_bytes: bytes, allowed_exts: list[str]) -> tuple[bytes
     with zipfile.ZipFile(in_buf, 'r') as zin:
         # Collect candidate files
         files_to_write = []  # list of tuples (new_name, data_bytes)
-        name_counts: dict[str,int] = {}
+        name_counts: dict[str, int] = {}
 
         for zi in zin.infolist():
             if zi.is_dir():
                 continue
-            filename = os.path.basename(zi.filename)
+            filename = Path(zi.filename).name
             if not filename:
                 continue
-            ext = os.path.splitext(filename)[1].lstrip('.').lower()
+            ext = Path(filename).suffix.lstrip('.').lower()
             if ext not in allowed:
                 continue
 
             # Determine subfolder (the directory part containing the file)
-            dirpath = os.path.dirname(zi.filename)
+            parent = Path(zi.filename).parent
+            dirpath = '' if str(parent) == '.' else str(parent)
             middle = clean_subfolder_middle_part(dirpath)
 
-            base, _ = os.path.splitext(filename)
+            base = Path(filename).stem
             new_base = f"{base}_{middle}" if middle else base
             # Avoid collisions
             count = name_counts.get(new_base, 0)
@@ -60,12 +62,11 @@ def extract_and_rename(zip_bytes: bytes, allowed_exts: list[str]) -> tuple[bytes
             data = zin.read(zi.filename)
             files_to_write.append((new_name, data))
 
-    # Build result zip
-    # Suggest an output name based on original zip filename if present, else generic
-    try:
-        original_name = zin.filename if hasattr(zin, 'filename') and zin.filename else 'extracted'
-    except Exception:
-        original_name = 'extracted'
+        # Try to obtain original archive filename (may be absent when reading bytes)
+        try:
+            original_name = zin.filename if hasattr(zin, 'filename') and zin.filename else 'extracted'
+        except Exception:
+            original_name = 'extracted'
 
     cleaned = sanitize_zip_name(original_name)
     result_name = f"{cleaned}_extracted.zip"
