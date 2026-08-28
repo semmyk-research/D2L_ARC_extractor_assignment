@@ -11,7 +11,9 @@ Components
 
 - extractor/archiver.py
   - Contains the main logic `extract_and_rename` which:
-    - Opens the uploaded zip archive (from bytes) using the standard `zipfile` module.
+    - Accepts bytes, a file-like, or a path-like input.
+    - For inputs smaller than `max_in_memory` it processes using an in-memory BytesIO.
+    - For larger inputs it writes the content to a temporary file and uses zipfile on disk.
     - Iterates over entries and selects files matching the allowed extensions.
     - Uses helpers from `extractor.utils` to determine the cleaned subfolder middle token and a safe output zip name.
     - Writes all selected files into a new zip in-memory and returns its bytes and name.
@@ -26,21 +28,25 @@ Data flow
 3. `extract_and_rename` processes the archive and returns a new zip as bytes.
 4. The UI offers the resulting archive for download.
 
-Notes on naming and rules
+Large-archive strategy
 
-- Subfolder name extraction tries to be heuristic: split on hyphens, pick the token with alphabetic characters closest to the middle, then remove non-alphanumeric characters and spaces.
-- Output zip names are sanitised by replacing non-alphanumeric sequences with underscores and appending `_extracted`.
+The system supports two modes:
+- In-memory mode: Fast and suitable for small uploads (default threshold 50 MiB).
+- Disk-backed streaming mode: For uploads larger than the threshold the archive is written to a temporary file and processed from disk to avoid large memory usage.
 
 Testing and extensibility
 
-- The pure functions in extractor can be unit-tested easily by feeding sample zip bytes and verifying outputs.
+- The pure functions in extractor can be unit-tested easily by feeding sample zip bytes and verifying outputs. Unit tests are included and executed in CI.
 - Adding new rules for name extraction (e.g. locale-aware name detection) can be done by modifying `clean_subfolder_middle_part`.
+
+Sanitisation example
+
+- Example: `ModuleCode_ICE00_ICETopic_ST12345678.pdf` inside `110328-506377 - Any Ntshonga - 14 August 2026 438 PM` becomes `ModuleCode_ICE0#_ICETopic_ST12345678_AnyNtshonga.pdf` (demonstrates masking part of module code to help de-identify sensitive components).
 
 Security considerations
 
-- The current implementation reads the uploaded zip file into memory. For very large archives this may use significant memory; for production deployments streaming or temporary-file-backed approaches are recommended.
-- The app only supports `.zip` uploads; other archive formats (tar, 7z) are not implemented.
+- In disk-backed mode uploaded archive bytes are written to a temporary file which is promptly deleted after processing. Ensure the environment running the app has appropriate access controls and temporary directory hygiene.
 
 Deployment
 
-- This is a small web app suitable for deployment on a server or container. The NiceGUI documentation has deployment guides for uvicorn/gunicorn.
+- The GitHub Actions workflow `ci_deploy.yml` will run tests and push the repository contents to the configured HuggingFace Space when commits are pushed to `main`.
