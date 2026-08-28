@@ -1,0 +1,12 @@
+# Byte-compiled / virtual env
+__pycache__/
+.venv/
+
+# macOS
+.DS_Store
+
+# Python
+*.pyc
+
+# Local archive outputs
+*.zip

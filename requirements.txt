@@ -1,0 +1,5 @@
+# Requirements for the project
+
+nicegui>=1.6
+
+# Keep minimal. The standard library covers zipfile, io, tempfile.
